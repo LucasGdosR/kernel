@@ -425,6 +425,23 @@ impl Vmem {
         Err(Error::new(ErrorCode::NoSuchEntry, reason))
     }
 
+    ///
+    /// # Description
+    ///
+    /// Copies data from user space to kernel space. The source and destination addresses do not
+    /// have to be aligned, but the source address range must lie in user space, and the destination
+    /// address range must lie in kernel space.
+    ///
+    /// # Parameters
+    ///
+    /// - `dst`: Destination address in kernel space.
+    /// - `src`: Source address in user space.
+    /// - `size`: Number of bytes to copy.
+    ///
+    /// # Returns
+    ///
+    /// Upon success, empty is returned. Upon failure, an error code is returned instead.
+    ///
     pub fn copy_from_user_unaligned(
         &self,
         dst: VirtualAddress,
