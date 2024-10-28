@@ -435,12 +435,13 @@ impl Vmem {
             fn __physcopy(dst: *mut u8, src: *const u8, size: usize);
         }
 
-        // Check if source address does not lie in user space.
-        if !Self::is_user_addr(src) {
-            let reason: &str = "source address does not lie in user space";
+        // Check if size is invalid.
+        if size == 0 {
+            let reason: &str = "zero-length copy";
             error!("copy_from_user_unaligned(): {}", reason);
-            return Err(Error::new(ErrorCode::BadAddress, reason));
+            return Err(Error::new(ErrorCode::InvalidArgument, reason));
         }
+
 
         // Check if destination address does not lie in kernel space.
         if !Self::is_kernel_addr(dst) {
