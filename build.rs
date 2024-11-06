@@ -25,23 +25,34 @@ use ::std::{
 //==================================================================================================
 
 fn main() {
-    //==============================================================================================
-    // Get Essential Environment Variables
-    //==============================================================================================
+    let out_dir = setup_path();
+    let cflags = setup_toolchain();    
+    let asm_sources = collect_sources();
+    
+    let object_files = compile_source(asm_sources, cflags, &out_dir);
 
+    build_archive(object_files, &out_dir);
+    link_archive(out_dir);
+}
+
+//==============================================================================================
+// Get Essential Environment Variables
+//==============================================================================================    
+
+fn setup_path() -> String {
     // Get OUT_DIR environment variable.
-    let out_dir: String = match env::var("OUT_DIR") {
+    match env::var("OUT_DIR") {
         Ok(out_dir) => out_dir,
         Err(_) => panic!("failed to get OUT_DIR environment variable"),
-    };
+    }
+}
 
-    //==============================================================================================
-    // Configure Toolchain
-    //==============================================================================================
+//==============================================================================================
+// Configure Toolchain
+//==============================================================================================
 
-    let cc: String = "gcc".to_string();
-
-    let mut cflags: Vec<&str> = vec![
+fn setup_toolchain<'a>() -> Vec<&'a str> {
+    let mut cflags: Vec<&'a str> = vec![
         "-nostdlib",
         "-ffreestanding",
         "-march=pentiumpro",
@@ -72,10 +83,14 @@ fn main() {
         }
     }
 
-    //==============================================================================================
-    // Collect Assembly Source Files
-    //==============================================================================================
+    cflags
+}
 
+//==============================================================================================
+// Collect Assembly Source Files
+//==============================================================================================
+
+fn collect_sources() -> Vec<String> {
     let sources_dir: Vec<&str> = vec!["src/hal/arch/x86"];
 
     // Collect *.S files in the sources directory
@@ -92,18 +107,21 @@ fn main() {
             }
         }
     }
+    asm_sources
+}
 
-    //==============================================================================================
-    // Compile Assembly Source Files
-    //==============================================================================================
+//==============================================================================================
+// Compile Assembly Source Files
+//==============================================================================================
 
+fn compile_source(asm_sources: Vec<String>, cflags: Vec<&str>, out_dir: &String) -> Vec<String> {
     // Compile assembly source files and collect object files.
     let mut object_files: Vec<String> = Vec::<String>::new();
     for asm in asm_sources.iter() {
         let obj: String =
             format!("{}/{}.o", out_dir, Path::new(asm).file_stem().unwrap().to_str().unwrap());
 
-        let status: ExitStatus = Command::new(cc.clone())
+        let status: ExitStatus = Command::new("gcc".to_string())
             .args(&cflags)
             .args(["-c", asm, "-o", &obj])
             .status()
@@ -116,24 +134,29 @@ fn main() {
         println!("cargo::rerun-if-changed={}", asm);
         object_files.push(obj);
     }
+    object_files
+}
 
-    //==============================================================================================
-    // Build Archive with Object Files
-    //==============================================================================================
+//==============================================================================================
+// Build Archive with Object Files
+//==============================================================================================
 
+fn build_archive(object_files: Vec<String>, out_dir: &String) {
     let status: ExitStatus = Command::new("ar")
         .args(["rcs", "libkernel.a"])
-        .args(&object_files)
-        .current_dir(Path::new(&out_dir))
+        .args(object_files)
+        .current_dir(Path::new(out_dir))
         .status()
         .unwrap();
     if !status.success() {
         panic!("failed to archive object files");
     }
+}
 
-    //==============================================================================================
-    // Link Archive
-    //==============================================================================================
+//==============================================================================================
+// Link Archive
+//==============================================================================================
 
+fn link_archive(out_dir: String) {
     println!("cargo::rustc-link-search=native={}", out_dir);
 }
