@@ -21,16 +21,31 @@ use ::std::{
 };
 
 //==================================================================================================
+// Structures
+//==================================================================================================
+
+///
+/// # Description
+///
+/// A compiler cli command with its flags.
+///
+#[derive(Debug)]
+pub struct CompilerCommand<'a> {
+    /// Compiler program. E.g.: gcc.
+    compiler_program: &'a str,
+    /// Flags for the compiler command.
+    cflags: Vec<&'a str>,
+}
+
+//==================================================================================================
 // Main Function
 //==================================================================================================
 
 fn main() {
-    let out_dir = setup_path();
-    let cflags = setup_toolchain();    
-    let asm_sources = collect_sources();
-    
-    let object_files = compile_source(asm_sources, cflags, &out_dir);
-
+    let out_dir: String = setup_path();
+    let toolchain: CompilerCommand = setup_toolchain();    
+    let asm_sources: Vec<String> = collect_sources();
+    let object_files: Vec<String> = compile_source(asm_sources, toolchain, &out_dir);
     build_archive(object_files, &out_dir);
     link_archive(out_dir);
 }
@@ -39,6 +54,15 @@ fn main() {
 // Get Essential Environment Variables
 //==============================================================================================    
 
+///
+/// # Description
+///
+/// Gets the OUT_DIR environment variable. Panics if the variable isn't present.
+///
+/// # Returns
+///
+/// The contents of the OUT_DIR environment variable.
+///
 fn setup_path() -> String {
     // Get OUT_DIR environment variable.
     match env::var("OUT_DIR") {
@@ -51,7 +75,19 @@ fn setup_path() -> String {
 // Configure Toolchain
 //==============================================================================================
 
-fn setup_toolchain<'a>() -> Vec<&'a str> {
+///
+/// # Description
+///
+/// Builds a cli command with a compiler invocation along with the flags used for compilation.
+/// Includes optional flags for debugging and microvm.
+///
+/// # Returns
+///
+/// A cli command to invoke a compiler with flags.
+///
+fn setup_toolchain<'a>() -> CompilerCommand<'a> {
+    let compiler_program: &str = "gcc";
+
     let mut cflags: Vec<&'a str> = vec![
         "-nostdlib",
         "-ffreestanding",
@@ -83,17 +119,25 @@ fn setup_toolchain<'a>() -> Vec<&'a str> {
         }
     }
 
-    cflags
+    CompilerCommand { compiler_program, cflags }
 }
 
 //==============================================================================================
 // Collect Assembly Source Files
 //==============================================================================================
 
+///
+/// # Description
+///
+/// Collects *.S files in the sources directory. Non-recursive.
+///
+/// # Returns
+///
+/// A vector with all paths to *.S files in the sources directory.
+///
 fn collect_sources() -> Vec<String> {
     let sources_dir: Vec<&str> = vec!["src/hal/arch/x86"];
 
-    // Collect *.S files in the sources directory
     let mut asm_sources = Vec::<String>::new();
     for dir in sources_dir.iter() {
         for entry in Path::new(dir).read_dir().unwrap() {
@@ -114,15 +158,29 @@ fn collect_sources() -> Vec<String> {
 // Compile Assembly Source Files
 //==============================================================================================
 
-fn compile_source(asm_sources: Vec<String>, cflags: Vec<&str>, out_dir: &String) -> Vec<String> {
-    // Compile assembly source files and collect object files.
+///
+/// # Description
+///
+/// Compiles assembly source files and collects object files. Panics if compilation fails.
+///
+/// # Parameters
+///
+/// - `asm_sources`: Paths of all *.S source files.
+/// - `toolchain`: The compiler to be used and the compilation flags.
+/// - `out_dir`: Path to store the *.o files.
+///
+/// # Returns
+///
+/// A vector with paths to the resulting object files.
+///
+fn compile_source(asm_sources: Vec<String>, toolchain: CompilerCommand, out_dir: &String) -> Vec<String> {
     let mut object_files: Vec<String> = Vec::<String>::new();
     for asm in asm_sources.iter() {
         let obj: String =
             format!("{}/{}.o", out_dir, Path::new(asm).file_stem().unwrap().to_str().unwrap());
 
-        let status: ExitStatus = Command::new("gcc".to_string())
-            .args(&cflags)
+        let status: ExitStatus = Command::new(toolchain.compiler_program)
+            .args(&toolchain.cflags)
             .args(["-c", asm, "-o", &obj])
             .status()
             .unwrap();
@@ -141,6 +199,16 @@ fn compile_source(asm_sources: Vec<String>, cflags: Vec<&str>, out_dir: &String)
 // Build Archive with Object Files
 //==============================================================================================
 
+///
+/// # Description
+///
+/// Builds archive with object files. Panics if it fails.
+///
+/// # Parameters
+///
+/// - `object_files`: Paths of all recently compiled *.o files.
+/// - `out_dir`: Path to the directory with the *.o files.
+///
 fn build_archive(object_files: Vec<String>, out_dir: &String) {
     let status: ExitStatus = Command::new("ar")
         .args(["rcs", "libkernel.a"])
@@ -157,6 +225,15 @@ fn build_archive(object_files: Vec<String>, out_dir: &String) {
 // Link Archive
 //==============================================================================================
 
+///
+/// # Description
+///
+/// Only prints a message.
+///
+/// # Parameters
+///
+/// - `out_dir`: Part of the printed message.
+///
 fn link_archive(out_dir: String) {
     println!("cargo::rustc-link-search=native={}", out_dir);
 }
