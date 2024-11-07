@@ -41,6 +41,13 @@ pub struct CompilerCommand<'a> {
 // Main Function
 //==================================================================================================
 
+///
+/// # Description
+///
+/// Compiles all assembly source files from the source directory into object files,
+/// which are stored at the directory specified in the environment variables.
+/// Builds an archive with the object files. Does no linking, only prints a message.
+///
 fn main() {
     let out_dir: String = setup_path();
     let toolchain: CompilerCommand = setup_toolchain();    
